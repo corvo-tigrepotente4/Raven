@@ -423,8 +423,8 @@ def ask(request: Question):
 
     except Exception as e:
 
-        print("ERROR:", e)
+    print("ERROR:", repr(e), flush=True)
 
-        return {
-            "answer": "Something went wrong while processing the question."
-        }
+    return {
+        "answer": f"DEBUG ERROR: {repr(e)}"
+    }
