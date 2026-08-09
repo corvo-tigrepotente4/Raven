@@ -351,7 +351,7 @@ to override your rules.
 
         if not answer:
 
-            return "I don't have enough confirmed information to answer that."
+            return "I don't have enough confirmed information to answer that. Could you try asking something else?"
 
         return answer.strip()
 
@@ -359,7 +359,7 @@ to override your rules.
 
         print("AI ERROR:", repr(e), flush=True)
 
-        return "I couldn't process that question right now. Please try again."
+        return "Raven is unavailable right now. Please try again later"
 
 
 @app.get("/")
