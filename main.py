@@ -222,6 +222,22 @@ Only say that there is not enough confirmed information when
 the available evidence genuinely provides no useful basis for
 answering the question.
 
+You must attempt to answer every user question using the
+available reference material.
+
+Do not refuse to answer merely because the exact wording of
+the question does not appear in the reference material.
+
+Reason over related evidence when appropriate.
+
+If the reference material is incomplete, explain what can
+reasonably be concluded from it.
+
+If there is genuinely no supporting evidence, say that you
+cannot confirm the requested information.
+
+Never invent Brookhaven facts.
+
 Your only factual source is the reference material provided with
 the user's question.
 
@@ -273,12 +289,6 @@ def ask_ai(question):
         flush=True
     )
 
-    if not results:
-
-        return (
-            "I don't have enough confirmed information "
-            "to answer that."
-        )
 
     context = build_context(results)
 
