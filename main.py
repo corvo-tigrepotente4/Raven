@@ -421,10 +421,10 @@ def ask(request: Question):
             "answer": answer
         }
 
-    except Exception as e:
-
-    print("ERROR:", repr(e), flush=True)
-
-    return {
-        "answer": f"DEBUG ERROR: {repr(e)}"
-    }
+        except Exception as e:
+    
+        print("ERROR:", repr(e), flush=True)
+    
+        return {
+            "answer": f"DEBUG ERROR: {repr(e)}"
+        }
