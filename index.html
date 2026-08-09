@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+```
+<title>Brookhaven AI</title>
+
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        margin: 0;
+        background: #0d1117;
+        color: #e6edf3;
+        font-family: Arial, Helvetica, sans-serif;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
+
+    header {
+        height: 64px;
+        display: flex;
+        align-items: center;
+        padding: 0 24px;
+        border-bottom: 1px solid #30363d;
+        background: #161b22;
+    }
+
+    .logo {
+        font-size: 20px;
+        font-weight: 700;
+    }
+
+    .status {
+        margin-left: 14px;
+        font-size: 13px;
+        color: #3fb950;
+    }
+
+    .status::before {
+        content: "";
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #3fb950;
+        margin-right: 6px;
+    }
+
+    #chat {
+        flex: 1;
+        overflow-y: auto;
+        padding: 30px 20px;
+    }
+
+    .message {
+        max-width: 850px;
+        margin: 0 auto 24px auto;
+    }
+
+    .label {
+        font-size: 12px;
+        font-weight: 700;
+        margin-bottom: 7px;
+        color: #8b949e;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .bubble {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        padding: 16px 18px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+
+    .user .bubble {
+        background: #21262d;
+    }
+
+    .thinking {
+        color: #8b949e;
+        font-style: italic;
+    }
+
+    footer {
+        border-top: 1px solid #30363d;
+        background: #161b22;
+        padding: 16px;
+    }
+
+    .input-area {
+        max-width: 850px;
+        margin: auto;
+        display: flex;
+        gap: 10px;
+    }
+
+    #question {
+        flex: 1;
+        resize: none;
+        min-height: 48px;
+        max-height: 150px;
+        padding: 14px;
+        border-radius: 10px;
+        border: 1px solid #30363d;
+        background: #0d1117;
+        color: #e6edf3;
+        font-family: inherit;
+        font-size: 15px;
+        outline: none;
+    }
+
+    #question:focus {
+        border-color: #58a6ff;
+    }
+
+    #send {
+        border: none;
+        border-radius: 10px;
+        padding: 0 20px;
+        background: #238636;
+        color: white;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    #send:hover {
+        background: #2ea043;
+    }
+
+    #send:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    @media (max-width: 600px) {
+        header {
+            padding: 0 16px;
+        }
+
+        #chat {
+            padding: 20px 12px;
+        }
+
+        .input-area {
+            gap: 6px;
+        }
+
+        #send {
+            padding: 0 14px;
+        }
+    }
+</style>
+```
+
+</head>
+
+<body>
+
+<header>
+    <div class="logo">🐦 Raven - Brookhaven Secrets Assistant</div>
+    <div class="status" id="status">Online</div>
+</header>
+
+<main id="chat">
+
+```
+<div class="message">
+    <div class="label">Brookhaven AI</div>
+
+    <div class="bubble">
+        Ask me about Brookhaven secrets, mysteries, puzzles, the Agency, quests, codes, and lore.
+    </div>
+</div>
+```
+
+</main>
+
+<footer>
+
+```
+<div class="input-area">
+
+    <textarea
+        id="question"
+        placeholder="Ask about a Brookhaven secret..."
+        rows="1"
+    ></textarea>
+
+    <button id="send">Send</button>
+
+</div>
+```
+
+</footer>
+
+<script>
+
+    // ============================================================
+    // CONFIG
+    // ============================================================
+
+    const API_URL = "https://raven-ksqm.onrender.com/ask";
+
+
+    // ============================================================
+    // ELEMENTS
+    // ============================================================
+
+    const chat = document.getElementById("chat");
+    const questionInput = document.getElementById("question");
+    const sendButton = document.getElementById("send");
+    const status = document.getElementById("status");
+
+
+    // ============================================================
+    // ADD MESSAGE
+    // ============================================================
+
+    function addMessage(label, text, type = "") {
+
+        const message = document.createElement("div");
+        message.className = `message ${type}`;
+
+        const labelElement = document.createElement("div");
+        labelElement.className = "label";
+        labelElement.textContent = label;
+
+        const bubble = document.createElement("div");
+        bubble.className = "bubble";
+        bubble.textContent = text;
+
+        message.appendChild(labelElement);
+        message.appendChild(bubble);
+
+        chat.appendChild(message);
+
+        chat.scrollTop = chat.scrollHeight;
+
+        return message;
+    }
+
+
+    // ============================================================
+    // ASK AI
+    // ============================================================
+
+    async function askAI() {
+
+        const question = questionInput.value.trim();
+
+        if (!question || sendButton.disabled) {
+            return;
+        }
+
+        addMessage("You", question, "user");
+
+        questionInput.value = "";
+        sendButton.disabled = true;
+
+        const thinkingMessage = addMessage(
+            "Brookhaven AI",
+            "Thinking...",
+            "ai"
+        );
+
+        thinkingMessage.querySelector(".bubble").classList.add("thinking");
+
+        status.textContent = "Thinking";
+
+        try {
+
+            const response = await fetch(API_URL, {
+
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+                    question: question
+                })
+
+            });
+
+
+            if (!response.ok) {
+                throw new Error(`Server returned ${response.status}`);
+            }
+
+
+            const data = await response.json();
+
+
+            thinkingMessage.querySelector(".bubble").textContent =
+                data.answer || "I couldn't generate an answer.";
+
+
+            thinkingMessage.querySelector(".bubble")
+                .classList.remove("thinking");
+
+            status.textContent = "Online";
+
+        }
+
+        catch (error) {
+
+            console.error(error);
+
+            thinkingMessage.querySelector(".bubble").textContent =
+                "I couldn't connect to Brookhaven AI right now.";
+
+            thinkingMessage.querySelector(".bubble")
+                .classList.remove("thinking");
+
+            status.textContent = "Connection error";
+
+        }
+
+        finally {
+
+            sendButton.disabled = false;
+            questionInput.focus();
+
+        }
+    }
+
+
+    // ============================================================
+    // SEND BUTTON
+    // ============================================================
+
+    sendButton.addEventListener("click", askAI);
+
+
+    // ============================================================
+    // ENTER TO SEND
+    // ============================================================
+
+    questionInput.addEventListener("keydown", function(event) {
+
+        if (event.key === "Enter" && !event.shiftKey) {
+
+            event.preventDefault();
+
+            askAI();
+
+        }
+
+    });
+
+
+    // ============================================================
+    // AUTO RESIZE TEXTAREA
+    // ============================================================
+
+    questionInput.addEventListener("input", function() {
+
+        this.style.height = "auto";
+
+        this.style.height =
+            Math.min(this.scrollHeight, 150) + "px";
+
+    });
+
+</script>
+
+</body>
+</html>
