@@ -403,5 +403,5 @@ def ask(request: Question):
         print("REQUEST ERROR:", repr(e), flush=True)
 
         return {
-            "answer": "I couldn't process that question right now. Please try again."
+            "answer": "Raven is busy right now. Please try again later."
         }
