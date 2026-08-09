@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
     <title>Raven — Brookhaven AI</title>
 
@@ -21,6 +24,7 @@
             --blue: #58a6ff;
             --green: #238636;
             --green-hover: #2ea043;
+            --danger: #f85149;
         }
 
         html,
@@ -52,9 +56,7 @@
             overflow: hidden;
         }
 
-        /* =========================
-           HEADER
-        ========================= */
+        /* HEADER */
 
         header {
             height: 64px;
@@ -67,8 +69,7 @@
 
             border-bottom: 1px solid var(--border);
 
-            background:
-                rgba(22, 27, 34, 0.92);
+            background: rgba(22, 27, 34, 0.92);
 
             backdrop-filter: blur(12px);
 
@@ -183,9 +184,7 @@
             transform: translateY(-1px);
         }
 
-        /* =========================
-           CHAT
-        ========================= */
+        /* CHAT */
 
         #chat {
             flex: 1;
@@ -213,11 +212,9 @@
         .message {
             max-width: 850px;
 
-            margin:
-                0 auto 25px auto;
+            margin: 0 auto 25px;
 
-            animation:
-                messageIn 0.3s ease both;
+            animation: messageIn 0.3s ease both;
         }
 
         .label {
@@ -239,7 +236,6 @@
 
         .label-raven::before {
             content: "🐦";
-
             font-size: 12px;
         }
 
@@ -291,9 +287,7 @@
                 );
         }
 
-        /* =========================
-           THINKING INDICATOR
-        ========================= */
+        /* THINKING */
 
         .thinking-bubble {
             display: inline-flex;
@@ -327,9 +321,7 @@
             animation-delay: 0.3s;
         }
 
-        /* =========================
-           EMPTY STATE
-        ========================= */
+        /* WELCOME */
 
         .welcome {
             max-width: 850px;
@@ -338,8 +330,7 @@
 
             text-align: center;
 
-            animation:
-                welcomeIn 0.6s ease both;
+            animation: welcomeIn 0.6s ease both;
         }
 
         .welcome-icon {
@@ -390,9 +381,7 @@
             line-height: 1.6;
         }
 
-        /* =========================
-           FOOTER
-        ========================= */
+        /* FOOTER */
 
         footer {
             border-top: 1px solid var(--border);
@@ -516,9 +505,13 @@
             text-align: center;
         }
 
-        /* =========================
-           ANIMATIONS
-        ========================= */
+        /* ERROR */
+
+        .error .bubble {
+            border-color: rgba(248, 81, 73, 0.35);
+        }
+
+        /* ANIMATIONS */
 
         @keyframes messageIn {
             from {
@@ -582,9 +575,7 @@
             }
         }
 
-        /* =========================
-           MOBILE
-        ========================= */
+        /* MOBILE */
 
         @media (max-width: 600px) {
 
@@ -669,7 +660,7 @@
 
         <div class="status">
             <span class="status-dot"></span>
-            Online
+            <span id="statusText">Online</span>
         </div>
 
     </div>
@@ -679,7 +670,7 @@
         <button
             class="header-button"
             id="newChat"
-            title="Start a new conversation"
+            type="button"
         >
             New chat
         </button>
@@ -722,7 +713,10 @@
             autocomplete="off"
         ></textarea>
 
-        <button id="send">
+        <button
+            id="send"
+            type="button"
+        >
             Send
         </button>
 
@@ -738,22 +732,19 @@
 <script>
 
     /*
-        ============================================================
-        RAVEN CONVERSATION MEMORY
-        ============================================================
+        IMPORTANT
 
-        This memory exists only in this browser tab/session.
+        The frontend and backend are served from the SAME
+        Render service.
 
-        It is NOT shared between users.
+        Therefore we use:
 
-        It is NOT stored in your Brookhaven database.
+            /ask
 
-        It is sent to /ask with each question.
+        instead of hardcoding an old Render URL.
     */
 
-    let conversationHistory = [];
-
-    let isProcessing = false;
+    const API_URL = "/ask";
 
 
     const chat = document.getElementById("chat");
@@ -761,11 +752,22 @@
     const send = document.getElementById("send");
     const newChat = document.getElementById("newChat");
     const welcome = document.getElementById("welcome");
+    const statusText = document.getElementById("statusText");
 
 
-    /* =========================================================
-       ADD MESSAGE
-    ========================================================= */
+    /*
+        Conversation memory.
+
+        This is intentionally kept in THIS browser session.
+
+        The backend receives the previous messages every time
+        Raven is asked something.
+
+        It does NOT mix conversations between users.
+    */
+
+    let conversation = [];
+
 
     function addMessage(role, text) {
 
@@ -777,8 +779,7 @@
 
         message.className =
             "message " +
-            (role === "user" ? "user" : "assistant");
-
+            (role === "user" ? "user" : "raven");
 
         const label = document.createElement("div");
 
@@ -787,7 +788,6 @@
             (role === "user"
                 ? "label-user"
                 : "label-raven");
-
 
         label.textContent =
             role === "user"
@@ -807,30 +807,17 @@
 
         chat.appendChild(message);
 
+        chat.scrollTop = chat.scrollHeight;
 
-        requestAnimationFrame(() => {
-
-            chat.scrollTo({
-                top: chat.scrollHeight,
-                behavior: "smooth"
-            });
-
-        });
+        return message;
     }
 
 
-    /* =========================================================
-       THINKING
-    ========================================================= */
-
-    function showThinking() {
+    function addThinking() {
 
         const message = document.createElement("div");
 
-        message.id = "thinking";
-
-        message.className = "message";
-
+        message.className = "message raven";
 
         const label = document.createElement("div");
 
@@ -863,132 +850,149 @@
 
         chat.appendChild(message);
 
+        chat.scrollTop = chat.scrollHeight;
 
-        chat.scrollTo({
-            top: chat.scrollHeight,
-            behavior: "smooth"
-        });
+        return message;
     }
 
 
-    function hideThinking() {
+    function setLoading(value) {
 
-        const thinking =
-            document.getElementById("thinking");
+        send.disabled = value;
 
-        if (thinking) {
-            thinking.remove();
-        }
+        question.disabled = value;
+
+        send.textContent =
+            value
+                ? "Thinking..."
+                : "Send";
     }
 
-
-    /* =========================================================
-       AUTO RESIZE TEXTAREA
-    ========================================================= */
-
-    function resizeTextarea() {
-
-        question.style.height = "auto";
-
-        question.style.height =
-            Math.min(
-                question.scrollHeight,
-                150
-            ) + "px";
-    }
-
-
-    question.addEventListener(
-        "input",
-        resizeTextarea
-    );
-
-
-    /* =========================================================
-       ASK RAVEN
-    ========================================================= */
 
     async function askRaven() {
-
-        if (isProcessing) {
-            return;
-        }
-
 
         const text =
             question.value.trim();
 
-
-        if (!text) {
+        if (!text || send.disabled) {
             return;
         }
 
 
-        isProcessing = true;
-
-        send.disabled = true;
-
-        question.disabled = true;
+        addMessage("user", text);
 
 
-        addMessage(
-            "user",
-            text
-        );
+        conversation.push({
+            role: "user",
+            content: text
+        });
 
 
         question.value = "";
 
-        resizeTextarea();
+        question.style.height = "48px";
+
+        setLoading(true);
 
 
-        showThinking();
+        const thinking =
+            addThinking();
 
 
         try {
 
             /*
-                Only the recent conversation is sent.
+                This is the actual request to FastAPI.
 
-                This keeps token usage under control.
+                The backend should accept:
+
+                {
+                    "message": "...",
+                    "conversation": [...]
+                }
             */
 
-            const recentHistory =
-                conversationHistory.slice(-6);
-
-
             const response =
-                await fetch("/ask", {
+                await fetch(API_URL, {
 
                     method: "POST",
 
                     headers: {
                         "Content-Type":
+                            "application/json",
+
+                        "Accept":
                             "application/json"
                     },
 
                     body: JSON.stringify({
 
-                        question: text,
+                        message: text,
 
-                        history:
-                            recentHistory
-
+                        conversation:
+                            conversation
                     })
-
                 });
 
 
-            const data =
-                await response.json();
+            /*
+                Always try to read the response body.
+
+                This makes backend errors visible instead
+                of hiding everything behind "Something went wrong".
+            */
+
+            const raw =
+                await response.text();
 
 
-            hideThinking();
+            if (!response.ok) {
 
+                throw new Error(
+                    "HTTP " +
+                    response.status +
+                    ": " +
+                    raw
+                );
+            }
+
+
+            let data;
+
+            try {
+
+                data =
+                    JSON.parse(raw);
+
+            } catch {
+
+                throw new Error(
+                    "Backend returned invalid JSON: " +
+                    raw
+                );
+            }
+
+
+            thinking.remove();
+
+
+            /*
+                Support several common backend response names.
+            */
 
             const answer =
-                data.answer ||
-                "I don't have enough confirmed information to answer that.";
+                data.answer ??
+                data.response ??
+                data.message ??
+                data.reply;
+
+
+            if (!answer) {
+
+                throw new Error(
+                    "Backend returned JSON, but no answer field was found."
+                );
+            }
 
 
             addMessage(
@@ -997,76 +1001,53 @@
             );
 
 
-            /*
-                Save BOTH sides of the conversation.
-            */
-
-            conversationHistory.push({
-
-                role: "user",
-
-                content: text
-
-            });
-
-
-            conversationHistory.push({
+            conversation.push({
 
                 role: "assistant",
 
                 content: answer
-
             });
 
 
-        }
+        } catch (error) {
 
-        catch (error) {
+            thinking.remove();
+
 
             console.error(
-                "Raven request error:",
+                "Raven request failed:",
                 error
             );
 
 
-            hideThinking();
+            const errorMessage =
+                "Raven could not contact the backend.\n\n" +
+                error.message;
 
 
-            addMessage(
-                "assistant",
-                "Something went wrong while contacting Raven. Please try again."
-            );
+            const message =
+                addMessage(
+                    "assistant",
+                    errorMessage
+                );
 
-        }
 
-        finally {
+            message.classList.add("error");
 
-            isProcessing = false;
+        } finally {
 
-            send.disabled = false;
-
-            question.disabled = false;
+            setLoading(false);
 
             question.focus();
-
         }
-
     }
 
-
-    /* =========================================================
-       SEND BUTTON
-    ========================================================= */
 
     send.addEventListener(
         "click",
         askRaven
     );
 
-
-    /* =========================================================
-       KEYBOARD
-    ========================================================= */
 
     question.addEventListener(
         "keydown",
@@ -1081,62 +1062,101 @@
 
                 askRaven();
             }
-
         }
     );
 
 
-    /* =========================================================
-       NEW CHAT
-    ========================================================= */
+    question.addEventListener(
+        "input",
+        function() {
+
+            this.style.height = "48px";
+
+            this.style.height =
+                Math.min(
+                    this.scrollHeight,
+                    150
+                ) + "px";
+        }
+    );
+
 
     newChat.addEventListener(
         "click",
         function() {
 
-            conversationHistory = [];
+            conversation = [];
 
             chat.innerHTML = "";
 
-
-            const newWelcome =
+            const welcomeElement =
                 document.createElement("div");
 
-            newWelcome.className =
+            welcomeElement.className =
                 "welcome";
 
+            welcomeElement.id =
+                "welcome";
 
-            newWelcome.innerHTML = `
-                <div class="welcome-icon">
-                    🐦
-                </div>
+            welcomeElement.innerHTML = `
+                <div class="welcome-icon">🐦</div>
 
-                <h1>
-                    Ask Raven
-                </h1>
+                <h1>Ask Raven</h1>
 
                 <p>
-                    Explore Brookhaven secrets,
-                    mysteries, puzzles, Agency lore,
-                    quests, codes, and theories.
+                    Explore Brookhaven secrets, mysteries,
+                    puzzles, Agency lore, quests, codes,
+                    and theories.
                 </p>
             `;
 
-
             chat.appendChild(
-                newWelcome
+                welcomeElement
             );
 
+            question.value = "";
 
             question.focus();
-
         }
     );
 
 
-    /* =========================================================
-       INITIAL FOCUS
-    ========================================================= */
+    /*
+        Check the backend when the page loads.
+
+        This does NOT use /ask.
+
+        It simply checks whether the server itself
+        is alive.
+    */
+
+    async function checkBackend() {
+
+        try {
+
+            const response =
+                await fetch("/");
+
+            if (response.ok) {
+
+                statusText.textContent =
+                    "Online";
+
+            } else {
+
+                statusText.textContent =
+                    "Backend error";
+            }
+
+        } catch {
+
+            statusText.textContent =
+                "Offline";
+        }
+    }
+
+
+    checkBackend();
 
     question.focus();
 
