@@ -1,34 +1,69 @@
+import os
 import sqlite3
 import re
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from groq import Groq
 
-# ==========================
-# CONFIG
-# ==========================
 
-API_KEY = "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"
+# ============================================================
+# CONFIG
+# ============================================================
 
 DATABASE = "secrets.db"
-
 MODEL = "llama-3.3-70b-versatile"
+
+API_KEY = os.environ.get("GROQ_API_KEY")
+
+if not API_KEY:
+    raise RuntimeError("GROQ_API_KEY environment variable is missing.")
 
 client = Groq(api_key=API_KEY)
 
-# ==========================
-# DATABASE
-# ==========================
 
-conn = sqlite3.connect(DATABASE)
+# ============================================================
+# FASTAPI
+# ============================================================
+
+app = FastAPI(title="Brookhaven AI")
+
+
+# Allow the GitHub Pages website to communicate with Render.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+class Question(BaseModel):
+    question: str
+
+
+# ============================================================
+# DATABASE
+# ============================================================
+
+conn = sqlite3.connect(
+    DATABASE,
+    check_same_thread=False
+)
+
 conn.row_factory = sqlite3.Row
 
 cursor = conn.cursor()
 
 
-# ==========================
+# ============================================================
 # TEXT CLEANING
-# ==========================
+# ============================================================
 
 def clean_text(text):
+
     if not text:
         return ""
 
@@ -44,17 +79,23 @@ def clean_text(text):
     return text.strip()
 
 
-# ==========================
+# ============================================================
 # SEARCH DATABASE
-# ==========================
+# ============================================================
 
 def search_database(query, limit=12):
+
     results = []
     seen = set()
 
     try:
+
         cursor.execute("""
-            SELECT rowid, title, content, url
+            SELECT
+                rowid,
+                title,
+                content,
+                url
             FROM secrets_fts
             WHERE secrets_fts MATCH ?
             LIMIT ?
@@ -63,6 +104,7 @@ def search_database(query, limit=12):
         rows = cursor.fetchall()
 
         for row in rows:
+
             key = row["url"] or row["title"]
 
             if key in seen:
@@ -77,13 +119,52 @@ def search_database(query, limit=12):
             })
 
     except Exception:
-        pass
+
+        # Fallback search
+        try:
+
+            cursor.execute("""
+                SELECT
+                    title,
+                    content,
+                    url
+                FROM secrets
+                WHERE
+                    title LIKE ?
+                    OR content LIKE ?
+                LIMIT ?
+            """, (
+                f"%{query}%",
+                f"%{query}%",
+                limit
+            ))
+
+            rows = cursor.fetchall()
+
+            for row in rows:
+
+                key = row["url"] or row["title"]
+
+                if key in seen:
+                    continue
+
+                seen.add(key)
+
+                results.append({
+                    "title": row["title"],
+                    "content": clean_text(row["content"]),
+                    "url": row["url"]
+                })
+
+        except Exception:
+            pass
 
     return results
 
-# ==========================
+
+# ============================================================
 # BUILD CONTEXT
-# ==========================
+# ============================================================
 
 def build_context(results):
 
@@ -92,7 +173,8 @@ def build_context(results):
     for i, page in enumerate(results, 1):
 
         context += f"""
-========== PAGE {i} ==========
+========== REFERENCE {i} ==========
+
 TITLE:
 {page['title']}
 
@@ -107,77 +189,99 @@ CONTENT:
     return context
 
 
-# ==========================
-# TEST
-# ==========================
-# ==========================
-# PROMPT
-# ==========================
+# ============================================================
+# SYSTEM PROMPT
+# ============================================================
 
 SYSTEM_PROMPT = """
 You are Brookhaven AI, an expert guide to Brookhaven RP mysteries,
 secrets, puzzles, hidden locations, quests, codes, the Agency, and lore.
 
-You are given reference material containing information about Brookhaven.
-Use that material to answer the user's question accurately.
+Your ONLY factual source for answering questions is the reference
+material provided with the user's question.
 
 IMPORTANT RESPONSE RULES:
 
-- Never mention the database, database pages, search results, retrieval,
-  documents, sources, context, prompts, or how you obtained information.
-- Never say "the database says", "the database mentions", "according to
-  the database", "I found", "the retrieved pages", or similar phrases.
-- Speak directly as a knowledgeable Brookhaven lore expert.
-- Do not discuss your search process.
-- Do not explain why a search result was or was not found.
-- Do not invent facts.
-- Do not turn weak associations into established facts.
-- If the provided information does not establish something, say that
-  clearly and briefly.
-- Distinguish confirmed information from theories or inferences.
-- Only call something an inference when there is actual evidence that
-  supports the connection.
-- Do not invent connections merely because two things appear in the
-  same reference material.
+- Never mention the database.
+- Never mention database pages.
+- Never mention search results.
+- Never mention retrieval.
+- Never mention documents, sources, context, or prompts.
+- Never explain how you obtained information.
+- Never say "the database says".
+- Never say "the database mentions".
+- Never say "according to the database".
+- Never say "I found".
+- Never refer to references by number.
+- Never say "PAGE 1", "PAGE 2", etc.
+- Never invent facts.
+- Never use outside knowledge to fill missing information.
+- Never fabricate locations, characters, events, items, buildings,
+  mechanics, quests, or lore.
+- Never turn a weak association into a confirmed fact.
+- Never assume two clues are connected just because they appear
+  in the same reference material.
+- If the evidence does not establish something, do not invent it.
+- If something is an inference, clearly identify it as an inference.
+- Connect multiple references only when they genuinely describe
+  the same event, clue, location, or mystery.
+- Answer naturally as a knowledgeable Brookhaven player.
+- Do not discuss the search process.
 - Do not repeat the user's question unnecessarily.
-- Give useful, direct answers.
-- Connect information from multiple references when they genuinely
-  describe the same event, clue, location, or mystery.
 - Keep answers easy to read.
-- Do not invent stuff that is not real if no pages found in database.
+- Do not invent information when evidence is unavailable.
 
-Your answer should feel like a knowledgeable Brookhaven player explaining
-the mystery to another player, not like an AI analyzing documents.
-
-Answer naturally and confidently when the evidence is clear.
-Keep answers easy to read.
-
-Avoid saying:
-"I couldn't find..."
-"The database says..."
-
-Instead speak naturally.
+You are a lore assistant, not a storyteller.
 """
 
-# ==========================
-# ASK AI
-# ==========================
+
+# ============================================================
+# QUERY EXPANSION
+# ============================================================
+
 def expand_query(question):
 
     prompt = f"""
-You are a search-query generator for a Brookhaven RP mystery database.
+You generate search queries for a Brookhaven RP lore archive.
 
-Convert the user's question into 5-8 short search queries that
-could retrieve relevant pages from a SQLite FTS database.
+USER QUESTION:
+{question}
+
+Generate 5-8 short search queries.
 
 Rules:
-- Extract important nouns and locations.
+
+- Preserve important words from the user's question.
+- Extract important nouns, objects, locations, names, codes,
+  and other specific terms.
 - Include singular/plural variations when useful.
-- Include obvious related terms.
-- Do NOT answer the question.
-- Do NOT invent specific lore facts.
-- Keep each query short.
-- Return ONLY the queries, one per line.
+- Search important nouns individually.
+- Use short combinations of important terms.
+- Do not replace specific terms with academic synonyms.
+- Do not generate generic categories.
+- Do not generate speculative concepts.
+- Do not invent Brookhaven lore.
+- Do not answer the question.
+- Return ONLY the search queries, one per line.
+
+For example:
+
+Question:
+Crows at farm
+
+Good:
+crow
+crows
+crow farm
+crow barn
+farm crow
+barn crow
+
+Bad:
+bird habitats
+farm wildlife
+crow behavior
+farm animals
 
 Question:
 {question}
@@ -191,7 +295,7 @@ Question:
                 "content": prompt
             }
         ],
-        temperature=0.1,
+        temperature=0.0,
         max_tokens=150
     )
 
@@ -206,16 +310,13 @@ Question:
     return queries[:8]
 
 
-
-
+# ============================================================
+# ASK AI
+# ============================================================
 
 def ask_ai(question):
 
     queries = expand_query(question)
-
-    print("\nSearch queries:")
-    for q in queries:
-        print(" -", q)
 
     all_results = []
     seen = set()
@@ -238,10 +339,18 @@ def ask_ai(question):
     # Limit context
     results = all_results[:15]
 
-    context = build_context(results)
+    # ========================================================
+    # HARD STOP — NO EVIDENCE
+    # ========================================================
 
-    print(f"\nSearching database... Found {len(results)} relevant page(s).")
-    print("Thinking...\n")
+    if not results:
+
+        return (
+            "I don't have enough confirmed information "
+            "to answer that."
+        )
+
+    context = build_context(results)
 
     messages = [
         {
@@ -251,23 +360,21 @@ def ask_ai(question):
         {
             "role": "user",
             "content": f"""
-DATABASE:
+Here is reference material about Brookhaven:
 
 {context}
 
-QUESTION:
+User question:
 
 {question}
 
-Answer using the database above.
+Answer the question using only the information supported by
+the reference material.
 
-Important:
-- Use relevant information from multiple pages when appropriate.
-- If the question refers to something indirectly, connect related
-  evidence from the retrieved pages.
-- Do not claim that information is absent merely because there was
-  no exact phrase match.
-- If you make an inference, clearly identify it as an inference.
+Do not mention the reference material or how it was obtained.
+
+If the reference material does not establish something, do not
+invent an answer.
 """
         }
     ]
@@ -275,39 +382,49 @@ Important:
     response = client.chat.completions.create(
         model=MODEL,
         messages=messages,
-        temperature=0.5,
-        max_tokens=1200,
+        temperature=0.4,
+        max_tokens=1200
     )
 
     return response.choices[0].message.content
 
 
-# ==========================
-# TERMINAL CHAT
-# ==========================
+# ============================================================
+# API
+# ============================================================
 
-if __name__ == "__main__":
+@app.get("/")
+def home():
 
-    print("=" * 50)
-    print("Brookhaven AI")
-    print("Type 'exit' to quit.")
-    print("=" * 50)
+    return {
+        "status": "online",
+        "name": "Brookhaven AI"
+    }
 
-    while True:
 
-        question = input("\nYou: ")
+@app.post("/ask")
+def ask(request: Question):
 
-        if question.lower() in ("exit", "quit"):
-            break
+    question = request.question.strip()
 
-        try:
-            answer = ask_ai(question)
+    if not question:
 
-            print("\nAI:\n")
-            print(answer)
+        return {
+            "answer": "Please enter a question."
+        }
 
-        except Exception as e:
-            print("\nERROR:")
-            print(e)
+    try:
 
-    conn.close()
+        answer = ask_ai(question)
+
+        return {
+            "answer": answer
+        }
+
+    except Exception as e:
+
+        print("ERROR:", e)
+
+        return {
+            "answer": "Something went wrong while processing the question."
+        }
