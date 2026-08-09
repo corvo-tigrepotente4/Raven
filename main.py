@@ -11,7 +11,7 @@ from groq import Groq
 
 
 DATABASE = "secrets.db"
-MODEL = "llama-3.3-70b-versatile"
+MODEL = "llama-3.1-8b-instant"
 
 API_KEY = os.environ.get("GROQ_API_KEY")
 
