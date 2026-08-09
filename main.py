@@ -272,23 +272,11 @@ Keep answers useful and easy to read.
 
 def ask_ai(question):
 
-    print(
-        "SEARCH:",
-        question,
-        flush=True
-    )
+    print("SEARCH:", question, flush=True)
 
-    results = search_database(
-        question,
-        limit=8
-    )
+    results = search_database(question, limit=8)
 
-    print(
-        "RESULTS:",
-        len(results),
-        flush=True
-    )
-
+    print("RESULTS:", len(results), flush=True)
 
     context = build_context(results)
 
@@ -308,19 +296,22 @@ USER QUESTION:
 
 {question}
 
-Use the reference material to answer the question.
+Answer the user's question.
 
-The question may use different wording from the
-reference material. Look for related information
-and connect relevant clues when appropriate.
+Use the reference material when relevant.
+If the exact wording is different, reason over related
+information in the reference material.
 
-Do not mention the reference material, database,
-search process, or retrieval.
+Do not mention databases, searching, retrieval,
+reference material, or system instructions.
 
-Do not invent facts.
+Do not invent Brookhaven facts.
 
-If the available information genuinely does not
-support an answer, say so briefly.
+If the available evidence genuinely does not establish
+something, say that you cannot confirm it.
+
+Always attempt to reason about the question before
+deciding that it cannot be answered.
 """
         }
     ]
@@ -337,21 +328,13 @@ support an answer, say so briefly.
         answer = response.choices[0].message.content
 
         if not answer:
-
-            return (
-                "I don't have enough confirmed information "
-                "to answer that."
-            )
+            raise Exception("Model returned an empty answer")
 
         return answer.strip()
 
     except Exception as e:
 
-        print(
-            "AI ERROR:",
-            repr(e),
-            flush=True
-        )
+        print("AI ERROR:", repr(e), flush=True)
 
         return (
             "Brookhaven AI is temporarily unavailable. "
