@@ -645,7 +645,7 @@
     <div class="brand">
 
         <div class="logo">
-            🐦
+            🐦‍⬛
         </div>
 
         <div>
@@ -685,7 +685,7 @@
     <div class="welcome" id="welcome">
 
         <div class="welcome-icon">
-            🐦
+            🐦‍⬛
         </div>
 
         <h1>
@@ -732,42 +732,57 @@
 <script>
 
     /*
-        IMPORTANT
+        ============================================================
+        RAVEN API
+        ============================================================
 
-        The frontend and backend are served from the SAME
-        Render service.
+        The frontend is NOT necessarily hosted by the FastAPI
+        Render service, so do NOT use "/ask".
 
-        Therefore we use:
-
-            /ask
-
-        instead of hardcoding an old Render URL.
+        This points directly to the NEW Raven backend.
     */
 
-    const API_URL = "/ask";
+    const API_URL =
+        "https://raven-ksqm.onrender.com/ask";
 
 
-    const chat = document.getElementById("chat");
-    const question = document.getElementById("question");
-    const send = document.getElementById("send");
-    const newChat = document.getElementById("newChat");
-    const welcome = document.getElementById("welcome");
-    const statusText = document.getElementById("statusText");
+    const chat =
+        document.getElementById("chat");
+
+    const question =
+        document.getElementById("question");
+
+    const send =
+        document.getElementById("send");
+
+    const newChat =
+        document.getElementById("newChat");
+
+    const welcome =
+        document.getElementById("welcome");
+
+    const statusText =
+        document.getElementById("statusText");
 
 
     /*
-        Conversation memory.
+        ============================================================
+        CONVERSATION MEMORY
+        ============================================================
 
-        This is intentionally kept in THIS browser session.
+        This memory belongs only to this browser conversation.
 
-        The backend receives the previous messages every time
-        Raven is asked something.
-
-        It does NOT mix conversations between users.
+        Each request sends the previous messages to the backend.
     */
 
     let conversation = [];
 
+
+    /*
+        ============================================================
+        ADD MESSAGE
+        ============================================================
+    */
 
     function addMessage(role, text) {
 
@@ -775,13 +790,18 @@
             welcome.remove();
         }
 
-        const message = document.createElement("div");
+        const message =
+            document.createElement("div");
 
         message.className =
             "message " +
-            (role === "user" ? "user" : "raven");
+            (role === "user"
+                ? "user"
+                : "raven");
 
-        const label = document.createElement("div");
+
+        const label =
+            document.createElement("div");
 
         label.className =
             "label " +
@@ -789,45 +809,65 @@
                 ? "label-user"
                 : "label-raven");
 
+
         label.textContent =
             role === "user"
                 ? "You"
                 : "Raven";
 
 
-        const bubble = document.createElement("div");
+        const bubble =
+            document.createElement("div");
 
-        bubble.className = "bubble";
+        bubble.className =
+            "bubble";
 
-        bubble.textContent = text;
+        bubble.textContent =
+            text;
 
 
         message.appendChild(label);
+
         message.appendChild(bubble);
 
         chat.appendChild(message);
 
-        chat.scrollTop = chat.scrollHeight;
+
+        chat.scrollTop =
+            chat.scrollHeight;
+
 
         return message;
     }
 
 
+    /*
+        ============================================================
+        THINKING INDICATOR
+        ============================================================
+    */
+
     function addThinking() {
 
-        const message = document.createElement("div");
+        const message =
+            document.createElement("div");
 
-        message.className = "message raven";
+        message.className =
+            "message raven";
 
-        const label = document.createElement("div");
+
+        const label =
+            document.createElement("div");
 
         label.className =
             "label label-raven";
 
-        label.textContent = "Raven";
+        label.textContent =
+            "Raven";
 
 
-        const bubble = document.createElement("div");
+        const bubble =
+            document.createElement("div");
 
         bubble.className =
             "bubble thinking-bubble";
@@ -846,21 +886,34 @@
 
 
         message.appendChild(label);
+
         message.appendChild(bubble);
 
         chat.appendChild(message);
 
-        chat.scrollTop = chat.scrollHeight;
+
+        chat.scrollTop =
+            chat.scrollHeight;
+
 
         return message;
     }
 
 
+    /*
+        ============================================================
+        LOADING STATE
+        ============================================================
+    */
+
     function setLoading(value) {
 
-        send.disabled = value;
+        send.disabled =
+            value;
 
-        question.disabled = value;
+        question.disabled =
+            value;
+
 
         send.textContent =
             value
@@ -869,28 +922,55 @@
     }
 
 
+    /*
+        ============================================================
+        ASK RAVEN
+        ============================================================
+    */
+
     async function askRaven() {
 
         const text =
             question.value.trim();
 
-        if (!text || send.disabled) {
+
+        if (
+            !text ||
+            send.disabled
+        ) {
             return;
         }
 
 
-        addMessage("user", text);
+        /*
+            Show user's message immediately.
+        */
 
+        addMessage(
+            "user",
+            text
+        );
+
+
+        /*
+            Add user message to local memory.
+        */
 
         conversation.push({
-            role: "user",
-            content: text
+
+            role:
+                "user",
+
+            content:
+                text
         });
 
 
         question.value = "";
 
-        question.style.height = "48px";
+        question.style.height =
+            "48px";
+
 
         setLoading(true);
 
@@ -902,44 +982,65 @@
         try {
 
             /*
-                This is the actual request to FastAPI.
+                ====================================================
+                IMPORTANT
 
-                The backend should accept:
+                main.py expects:
+
+                {
+                    "question": "...",
+                    "history": [...]
+                }
+
+                NOT:
 
                 {
                     "message": "...",
                     "conversation": [...]
                 }
+                ====================================================
             */
 
+            const history =
+                conversation
+                    .slice(0, -1)
+                    .slice(-6);
+
+
             const response =
-                await fetch(API_URL, {
+                await fetch(
+                    API_URL,
+                    {
 
-                    method: "POST",
+                        method:
+                            "POST",
 
-                    headers: {
-                        "Content-Type":
-                            "application/json",
+                        headers:
+                            {
+                                "Content-Type":
+                                    "application/json",
 
-                        "Accept":
-                            "application/json"
-                    },
+                                "Accept":
+                                    "application/json"
+                            },
 
-                    body: JSON.stringify({
+                        body:
+                            JSON.stringify({
 
-                        message: text,
+                                question:
+                                    text,
 
-                        conversation:
-                            conversation
-                    })
-                });
+                                history:
+                                    history
+                            })
+                    }
+                );
 
 
             /*
-                Always try to read the response body.
+                Always read the response body.
 
-                This makes backend errors visible instead
-                of hiding everything behind "Something went wrong".
+                This makes backend errors visible.
             */
 
             const raw =
@@ -959,6 +1060,7 @@
 
             let data;
 
+
             try {
 
                 data =
@@ -967,7 +1069,7 @@
             } catch {
 
                 throw new Error(
-                    "Backend returned invalid JSON: " +
+                    "Backend returned invalid JSON:\n" +
                     raw
                 );
             }
@@ -977,23 +1079,31 @@
 
 
             /*
-                Support several common backend response names.
+                main.py returns:
+
+                {
+                    "answer": "..."
+                }
             */
 
             const answer =
-                data.answer ??
-                data.response ??
-                data.message ??
-                data.reply;
+                data.answer;
 
 
-            if (!answer) {
+            if (
+                typeof answer !== "string" ||
+                !answer.trim()
+            ) {
 
                 throw new Error(
-                    "Backend returned JSON, but no answer field was found."
+                    "Backend returned no usable answer."
                 );
             }
 
+
+            /*
+                Show Raven's answer.
+            */
 
             addMessage(
                 "assistant",
@@ -1001,11 +1111,17 @@
             );
 
 
+            /*
+                Store Raven's answer in conversation memory.
+            */
+
             conversation.push({
 
-                role: "assistant",
+                role:
+                    "assistant",
 
-                content: answer
+                content:
+                    answer
             });
 
 
@@ -1020,19 +1136,22 @@
             );
 
 
-            const errorMessage =
+            const errorText =
                 "Raven could not contact the backend.\n\n" +
                 error.message;
 
 
-            const message =
+            const errorMessage =
                 addMessage(
                     "assistant",
-                    errorMessage
+                    errorText
                 );
 
 
-            message.classList.add("error");
+            errorMessage.classList.add(
+                "error"
+            );
+
 
         } finally {
 
@@ -1043,11 +1162,23 @@
     }
 
 
+    /*
+        ============================================================
+        SEND BUTTON
+        ============================================================
+    */
+
     send.addEventListener(
         "click",
         askRaven
     );
 
+
+    /*
+        ============================================================
+        ENTER TO SEND
+        ============================================================
+    */
 
     question.addEventListener(
         "keydown",
@@ -1066,11 +1197,19 @@
     );
 
 
+    /*
+        ============================================================
+        AUTO-RESIZE TEXTAREA
+        ============================================================
+    */
+
     question.addEventListener(
         "input",
         function() {
 
-            this.style.height = "48px";
+            this.style.height =
+                "48px";
+
 
             this.style.height =
                 Math.min(
@@ -1081,25 +1220,36 @@
     );
 
 
+    /*
+        ============================================================
+        NEW CHAT
+        ============================================================
+    */
+
     newChat.addEventListener(
         "click",
         function() {
 
             conversation = [];
 
+
             chat.innerHTML = "";
+
 
             const welcomeElement =
                 document.createElement("div");
 
+
             welcomeElement.className =
                 "welcome";
+
 
             welcomeElement.id =
                 "welcome";
 
+
             welcomeElement.innerHTML = `
-                <div class="welcome-icon">🐦</div>
+                <div class="welcome-icon">🐦‍⬛</div>
 
                 <h1>Ask Raven</h1>
 
@@ -1110,11 +1260,19 @@
                 </p>
             `;
 
+
             chat.appendChild(
                 welcomeElement
             );
 
-            question.value = "";
+
+            question.value =
+                "";
+
+
+            question.style.height =
+                "48px";
+
 
             question.focus();
         }
@@ -1122,12 +1280,11 @@
 
 
     /*
-        Check the backend when the page loads.
+        ============================================================
+        BACKEND STATUS CHECK
+        ============================================================
 
-        This does NOT use /ask.
-
-        It simply checks whether the server itself
-        is alive.
+        This checks the NEW Render backend directly.
     */
 
     async function checkBackend() {
@@ -1135,7 +1292,10 @@
         try {
 
             const response =
-                await fetch("/");
+                await fetch(
+                    "https://raven-ksqm.onrender.com/"
+                );
+
 
             if (response.ok) {
 
@@ -1148,7 +1308,14 @@
                     "Backend error";
             }
 
-        } catch {
+
+        } catch (error) {
+
+            console.error(
+                "Backend status check failed:",
+                error
+            );
+
 
             statusText.textContent =
                 "Offline";
@@ -1156,7 +1323,16 @@
     }
 
 
+    /*
+        Start backend check.
+    */
+
     checkBackend();
+
+
+    /*
+        Focus input.
+    */
 
     question.focus();
 
