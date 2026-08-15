@@ -19,7 +19,7 @@ DATABASE = "secrets.db"
 
 MODEL = os.getenv(
     "GROQ_MODEL",
-    "llama-3.1-8b-instant"
+    "openai/gpt-oss-20b"
 )
 
 if not API_KEY:
